@@ -1,0 +1,38 @@
+{
+  "expo": {
+    "name": "Tower of Dreams",
+    "slug": "tower-of-dreams",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "scheme": "towerofdreams",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#07080d"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.towerofdreams.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#07080d",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "package": "com.towerofdreams.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ]
+  }
+}
