@@ -392,7 +392,7 @@ BEGIN
   VALUES (NEW.id, 0);
 
   -- Update unique builders count
-  UPDATE tower_state
+  UPDATE public.tower_state
   SET total_unique_builders = total_unique_builders + 1
   WHERE id = 1;
 
