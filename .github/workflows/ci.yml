@@ -42,7 +42,7 @@ jobs:
           echo "✅ Type check complete"
 
   # ═══════════════════════════════════════
-  # Job 2: Build Web
+  # Job 2: Build Web + Artifact
   # ═══════════════════════════════════════
   build-web:
     name: 🌐 Build Web
@@ -63,16 +63,157 @@ jobs:
 
       - name: Export web build
         run: npx expo export --platform web
-        continue-on-error: true
 
       - name: Verify web output
         run: |
           if [ -d "dist" ]; then
             echo "✅ Web build output found"
+            echo ""
+            echo "📊 Build stats:"
+            echo "  Files: $(find dist -type f | wc -l)"
+            echo "  Total size: $(du -sh dist | cut -f1)"
+            echo ""
             ls -la dist/
           else
-            echo "⚠️ Web build directory not found (may need additional config)"
+            echo "❌ Web build failed - dist/ not found"
+            exit 1
           fi
+
+      - name: Upload web build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tower-of-dreams-web-${{ github.sha }}
+          path: dist/
+          retention-days: 30
+          if-no-files-found: error
+
+  # ═══════════════════════════════════════
+  # Job 2b: Deploy-ready package
+  # ═══════════════════════════════════════
+  package-release:
+    name: 📦 Package Release
+    runs-on: ubuntu-latest
+    needs: [typecheck, build-web, validate-structure, validate-sql, audit]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build web
+        run: npx expo export --platform web
+
+      - name: Generate build info
+        run: |
+          cat > dist/build-info.json << EOF
+          {
+            "project": "Tower of Dreams",
+            "version": "$(node -e "console.log(require('./package.json').version)")",
+            "commit": "${{ github.sha }}",
+            "branch": "${{ github.ref_name }}",
+            "buildDate": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+            "buildNumber": "${{ github.run_number }}",
+            "nodeVersion": "$(node -v)",
+            "expoVersion": "$(npx expo --version)"
+          }
+          EOF
+          echo "📋 Build info:"
+          cat dist/build-info.json
+
+      - name: Create deploy package
+        run: |
+          mkdir -p release
+
+          # Web deploy package (Vercel / Netlify / static hosting)
+          cd dist
+          tar -czf ../release/tower-of-dreams-web-v$(node -e "console.log(require('../package.json').version)")-build${{ github.run_number }}.tar.gz .
+          cd ..
+
+          # Source package (for review / mobile builds)
+          tar --exclude='node_modules' \
+              --exclude='.git' \
+              --exclude='.expo' \
+              --exclude='dist' \
+              --exclude='release' \
+              -czf release/tower-of-dreams-source-v$(node -e "console.log(require('./package.json').version)")-build${{ github.run_number }}.tar.gz .
+
+          # SQL migration package
+          cp supabase/migrations/001_initial_schema.sql release/
+
+          # Generate deploy instructions
+          cat > release/DEPLOY.md << 'DEPLOYEOF'
+          # 🚀 Tower of Dreams — Deploy Guide
+
+          ## Web Deploy (Vercel)
+
+          ### Option A: Auto-deploy from GitHub
+          1. Go to vercel.com → New Project → Import `diplez/tower-of-dreams`
+          2. Set environment variables:
+             - `EXPO_PUBLIC_SUPABASE_URL`
+             - `EXPO_PUBLIC_SUPABASE_ANON_KEY`
+             - `EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+          3. Deploy!
+
+          ### Option B: Manual deploy from this artifact
+          1. Extract `tower-of-dreams-web-*.tar.gz`
+          2. Upload `dist/` contents to any static hosting
+          3. Configure environment variables
+
+          ## Database Setup
+          1. Create project on supabase.com
+          2. Go to SQL Editor
+          3. Run `001_initial_schema.sql`
+          4. Copy project URL and anon key to env vars
+
+          ## Mobile (Future)
+          ```bash
+          # Install EAS CLI
+          npm install -g eas-cli
+
+          # Build for iOS
+          eas build --platform ios
+
+          # Build for Android
+          eas build --platform android
+          ```
+          DEPLOYEOF
+
+          echo ""
+          echo "📦 Release package contents:"
+          ls -lh release/
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tower-of-dreams-release-build${{ github.run_number }}
+          path: release/
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Summary
+        run: |
+          echo "## 🏗️ Tower of Dreams — Build #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Item | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Commit | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Branch | \`${{ github.ref_name }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build | #${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Date | $(date -u +%Y-%m-%d) |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- **Web build** — Static files ready for Vercel/Netlify" >> $GITHUB_STEP_SUMMARY
+          echo "- **Source package** — Full source for mobile builds" >> $GITHUB_STEP_SUMMARY
+          echo "- **SQL schema** — Database migration file" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deploy guide** — Step-by-step instructions" >> $GITHUB_STEP_SUMMARY
 
   # ═══════════════════════════════════════
   # Job 3: Project Structure Validation
