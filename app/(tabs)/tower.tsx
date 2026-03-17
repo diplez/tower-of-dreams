@@ -2,7 +2,7 @@
 // Tower Screen — Main experience
 // ═══════════════════════════════════════
 
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -10,28 +10,31 @@ import { useTowerStore, useWalletStore, useAuthStore } from '@/lib/store';
 import { COLORS, formatFloorNumber, getBiome, TOWER_MAX_FLOORS } from '@/constants/game';
 import { ProgressBar, CoinDisplay } from '@/components/ui';
 import { FloorList } from '@/components/tower/FloorList';
+import { AnimationOverlay, FloorCompletedFlash } from '@/components/animations';
 
 export default function TowerScreen() {
   const router = useRouter();
-  const { towerState, currentFloor } = useTowerStore();
+  const { towerState, currentFloor, lastAnimationEvent, clearAnimation } = useTowerStore();
   const { wallet } = useWalletStore();
   const { profile } = useAuthStore();
   const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  // Memoize stars so they don't re-randomize on every render
+  const stars = useMemo(() =>
+    Array.from({ length: 30 }, (_, i) => ({
+      id: i,
+      left: `${Math.random() * 100}%`,
+      top: `${Math.random() * 50}%`,
+      size: Math.random() * 2 + 1,
+      opacity: Math.random() * 0.5 + 0.1,
+    })), []);
 
   // Pulse animation for build button
   useEffect(() => {
     const pulse = Animated.loop(
       Animated.sequence([
-        Animated.timing(pulseAnim, {
-          toValue: 1.04,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }),
+        Animated.timing(pulseAnim, { toValue: 1.04, duration: 1200, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1, duration: 1200, useNativeDriver: true }),
       ])
     );
     pulse.start();
@@ -64,24 +67,27 @@ export default function TowerScreen() {
       {/* Background gradient based on biome */}
       <View style={[styles.bg, { backgroundColor: biome.bgGradient[0] }]} />
 
-      {/* Stars / particles */}
+      {/* Stars / particles (memoized) */}
       <View style={styles.stars}>
-        {Array.from({ length: 30 }).map((_, i) => (
+        {stars.map((s) => (
           <View
-            key={i}
-            style={[
-              styles.star,
-              {
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 50}%`,
-                width: Math.random() * 2 + 1,
-                height: Math.random() * 2 + 1,
-                opacity: Math.random() * 0.5 + 0.1,
-              },
-            ]}
+            key={s.id}
+            style={[styles.star, {
+              left: s.left as any, top: s.top as any,
+              width: s.size, height: s.size, opacity: s.opacity,
+            }]}
           />
         ))}
       </View>
+
+      {/* Animation overlays */}
+      {lastAnimationEvent && lastAnimationEvent.level !== 'standard' && (
+        <AnimationOverlay
+          level={lastAnimationEvent.level}
+          floorNumber={lastAnimationEvent.floorId}
+          onComplete={clearAnimation}
+        />
+      )}
 
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* HUD Top */}
