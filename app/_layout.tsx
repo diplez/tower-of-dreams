@@ -22,10 +22,11 @@ export default function RootLayout() {
     if (isLoading) return;
 
     const inAuthGroup = segments[0] === 'auth';
+    const inProtectedArea = segments[0] === '(tabs)' || segments[0] === 'floor';
 
     if (!isAuthenticated && !inAuthGroup) {
       router.replace('/auth/login');
-    } else if (isAuthenticated && inAuthGroup) {
+    } else if (isAuthenticated && !inProtectedArea) {
       router.replace('/(tabs)/tower');
     }
   }, [isAuthenticated, isLoading, segments]);

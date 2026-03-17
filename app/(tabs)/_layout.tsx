@@ -2,6 +2,10 @@
 // Tabs Layout — Bottom Navigation
 // ═══════════════════════════════════════
 
+export const unstable_settings = {
+  initialRouteName: 'tower',
+};
+
 import { useEffect } from 'react';
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, Platform } from 'react-native';

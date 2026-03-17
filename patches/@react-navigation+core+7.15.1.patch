@@ -1,0 +1,27 @@
+diff --git a/node_modules/@react-navigation/core/lib/module/useNavigationBuilder.js b/node_modules/@react-navigation/core/lib/module/useNavigationBuilder.js
+index d00bea3..f8e9e44 100644
+--- a/node_modules/@react-navigation/core/lib/module/useNavigationBuilder.js
++++ b/node_modules/@react-navigation/core/lib/module/useNavigationBuilder.js
+@@ -275,11 +275,17 @@ export function useNavigationBuilder(createRouter, options) {
+       const paramsForState = isNestedParamsConsumed ? undefined : route?.params;
+       const stateFromParams = paramsForState ? getStateFromParams(paramsForState) : undefined;
+       const stateBeforeInitialization = stateFromParams ?? currentState;
+-      const hydratedState = router.getRehydratedState(stateBeforeInitialization, {
+-        routeNames,
+-        routeParamList: initialRouteParamList,
+-        routeGetIdList
+-      });
++      const hydratedState = stateBeforeInitialization != null
++        ? router.getRehydratedState(stateBeforeInitialization, {
++            routeNames,
++            routeParamList: initialRouteParamList,
++            routeGetIdList
++          })
++        : router.getInitialState({
++            routeNames,
++            routeParamList: initialRouteParamList,
++            routeGetIdList
++          });
+       if (options.UNSTABLE_routeNamesChangeBehavior === 'lastUnhandled' && doesStateHaveOnlyInvalidRoutes(stateBeforeInitialization)) {
+         return [stateBeforeInitialization, hydratedState, true, paramsForState];
+       }
