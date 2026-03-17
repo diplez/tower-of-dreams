@@ -11,9 +11,8 @@ import { creditTestCoins } from '@/lib/payments';
 import { CoinDisplay, Card, Button } from '@/components/ui';
 import type { CoinPackage } from '@/types';
 
-// Set to true to enable free test coins (disable in production!)
-const DEV_MODE = !process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY ||
-  process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY === 'pk_test_placeholder';
+// Set to false when Stripe Payment Sheet is fully configured
+const DEV_MODE = true;
 
 export default function ShopScreen() {
   const { wallet, fetchWallet } = useWalletStore();

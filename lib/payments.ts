@@ -63,6 +63,7 @@ export async function confirmPayment(
 
 /**
  * DEV ONLY: Credit free coins for testing (bypasses Stripe)
+ * Requires: Run supabase/migrations/002_dev_tools.sql first
  * Remove this in production!
  */
 export async function creditTestCoins(
@@ -70,31 +71,22 @@ export async function creditTestCoins(
   amount: number
 ): Promise<{ success: boolean; newBalance?: number; error?: string }> {
   try {
-    // Direct wallet update for testing
-    const { data: wallet, error: fetchError } = await supabase
-      .from('wallets')
-      .select('balance')
-      .eq('user_id', userId)
-      .single();
+    const { data, error } = await supabase.rpc('credit_test_coins', {
+      p_user_id: userId,
+      p_amount: amount,
+    });
 
-    if (fetchError || !wallet) {
-      return { success: false, error: 'Wallet not found' };
+    if (error) {
+      return { success: false, error: error.message };
     }
 
-    const { data, error } = await supabase
-      .from('wallets')
-      .update({
-        balance: wallet.balance + amount,
-        total_purchased: amount,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('user_id', userId)
-      .select('balance')
-      .single();
+    const result = data as { success: boolean; new_balance?: number; error?: string };
 
-    if (error) return { success: false, error: error.message };
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to credit coins' };
+    }
 
-    return { success: true, newBalance: data?.balance };
+    return { success: true, newBalance: result.new_balance };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
