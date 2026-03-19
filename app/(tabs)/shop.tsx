@@ -7,12 +7,13 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Platform }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, COIN_PACKAGES } from '@/constants/game';
 import { useWalletStore, useAuthStore } from '@/lib/store';
-import { creditTestCoins } from '@/lib/payments';
+import { creditTestCoins, openStripeCheckout } from '@/lib/payments';
 import { CoinDisplay, Card, Button } from '@/components/ui';
 import type { CoinPackage } from '@/types';
 
-// Set to false when Stripe Payment Sheet is fully configured
-const DEV_MODE = true;
+// DEV_MODE: true = free coins, false = real Stripe payments
+const STRIPE_KEY = process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || '';
+const DEV_MODE = !STRIPE_KEY || STRIPE_KEY === 'pk_test_placeholder';
 
 export default function ShopScreen() {
   const { wallet, fetchWallet } = useWalletStore();
@@ -46,27 +47,36 @@ export default function ShopScreen() {
         ]
       );
     } else {
-      // PRODUCTION: Use Stripe
-      Alert.alert(
-        'Comprar monedas',
-        `¿Comprar ${pkg.coins.toLocaleString()} monedas por $${pkg.price} USD?`,
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: `Pagar $${pkg.price}`,
-            onPress: async () => {
-              setPurchasing(pkg.id);
-              // TODO: Implement Stripe Payment Sheet
-              // 1. Call createPaymentIntent()
-              // 2. Open Stripe Payment Sheet
-              // 3. On success, call confirmPayment()
-              // 4. Refresh wallet
-              Alert.alert('Stripe', 'Integración de Stripe Payment Sheet pendiente');
-              setPurchasing(null);
+      // PRODUCTION: Use Stripe Payment
+      if (Platform.OS === 'web') {
+        // Web: Open Stripe Payment Element modal
+        setPurchasing(pkg.id);
+        const result = await openStripeCheckout(profile.id, pkg);
+        if (result.success) {
+          await fetchWallet(profile.id);
+          Alert.alert('✅ ¡Pago exitoso!', `Se acreditaron ${pkg.coins.toLocaleString()} monedas a tu cuenta.`);
+        } else if (result.error && result.error !== 'Pago cancelado') {
+          Alert.alert('Error en el pago', result.error);
+        }
+        setPurchasing(null);
+      } else {
+        // Native: TODO - implement @stripe/stripe-react-native Payment Sheet
+        Alert.alert(
+          'Comprar monedas',
+          `¿Comprar ${pkg.coins.toLocaleString()} monedas por $${pkg.price} USD?`,
+          [
+            { text: 'Cancelar', style: 'cancel' },
+            {
+              text: `Pagar $${pkg.price}`,
+              onPress: async () => {
+                setPurchasing(pkg.id);
+                Alert.alert('Próximamente', 'Pagos nativos disponibles pronto. Usa la versión web.');
+                setPurchasing(null);
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      }
     }
   };
 
